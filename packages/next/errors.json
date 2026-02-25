@@ -1171,5 +1171,8 @@
   "1170": "\"null\" or \"undefined\" thrown",
   "1171": "Unexpected request from parent process: %s",
   "1172": "Worker exited unexpectedly with code %s, signal %s",
-  "1173": "Worker restarted due to timeout"
+  "1173": "Worker restarted due to timeout",
+  "1174": "maxBootingWorkers must be at least 1",
+  "1175": "Worker exited during shutdown",
+  "1176": "Worker pool ended while requests were in-flight"
 }
