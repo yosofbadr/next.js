@@ -1174,5 +1174,6 @@
   "1173": "Worker restarted due to timeout",
   "1174": "maxBootingWorkers must be at least 1",
   "1175": "Worker exited during shutdown",
-  "1176": "Worker pool ended while requests were in-flight"
+  "1176": "Worker pool ended while requests were in-flight",
+  "1177": "Worker is ended, no more calls can be done to it"
 }
