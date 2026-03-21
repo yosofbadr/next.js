@@ -86,6 +86,9 @@ struct ValueArguments {
     transparent: bool,
     /// Should we `#[derive(turbo_tasks::OperationValue)]`?
     operation: Option<Span>,
+    /// Whether this value has session-dependent interior state that survives serialization
+    /// but would be lost on eviction/restore mid-session.
+    session_stateful: bool,
 }
 
 impl Parse for ValueArguments {
@@ -98,6 +101,7 @@ impl Parse for ValueArguments {
             manual_hash: false,
             transparent: false,
             operation: None,
+            session_stateful: false,
         };
         let punctuated = input.parse_terminated(Meta::parse, Token![,])?;
         for meta in punctuated {
@@ -171,6 +175,9 @@ impl Parse for ValueArguments {
                 ("transparent", Meta::Path(_)) => {
                     result.transparent = true;
                 }
+                ("session_stateful", Meta::Path(_)) => {
+                    result.session_stateful = true;
+                }
                 ("operation", Meta::Path(path)) => {
                     result.operation = Some(path.span());
                 }
@@ -201,6 +208,7 @@ pub fn value(args: TokenStream, input: TokenStream) -> TokenStream {
         manual_hash,
         transparent,
         operation,
+        session_stateful,
     } = parse_macro_input!(args as ValueArguments);
 
     // `serialization = "hash"` only makes sense with `cell = "compare"` (the default).
@@ -447,6 +455,7 @@ pub fn value(args: TokenStream, input: TokenStream) -> TokenStream {
         cell_mode,
         new_value_type,
         has_serialization,
+        session_stateful,
     );
 
     let expanded = quote! {
@@ -473,6 +482,7 @@ pub fn value_type_and_register(
     cell_mode: proc_macro2::TokenStream,
     new_value_type: proc_macro2::TokenStream,
     has_serialization: proc_macro2::TokenStream,
+    session_stateful: bool,
 ) -> proc_macro2::TokenStream {
     let value_type_ident = get_value_type_ident(ident);
 
@@ -492,6 +502,7 @@ pub fn value_type_and_register(
         unsafe impl #impl_generics turbo_tasks::VcValueType for #ty #where_clause {
             type Read = #read;
             type CellMode = #cell_mode;
+            const IS_SESSION_STATEFUL: bool = #session_stateful;
 
             fn get_value_type_id() -> turbo_tasks::ValueTypeId {
                 turbo_tasks::registry::get_value_type_id(&#value_type_ident)
@@ -500,6 +511,7 @@ pub fn value_type_and_register(
             fn has_serialization() -> bool {
                 #has_serialization
             }
+
         }
     }
 }

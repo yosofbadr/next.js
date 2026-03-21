@@ -425,6 +425,7 @@ mod tests {
             type Read = VcDefaultRead<Struct>;
 
             type CellMode = VcCellNewMode<Struct>;
+            const IS_SESSION_STATEFUL: bool = false;
 
             fn get_value_type_id() -> crate::ValueTypeId {
                 todo!()

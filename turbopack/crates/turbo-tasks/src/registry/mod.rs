@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     TraitType, ValueType,
-    id::{FunctionId, TraitTypeId, ValueTypeId},
+    id::{FunctionId, SESSION_STATEFUL_BIT, TraitTypeId, ValueTypeId},
     native_function::NativeFunction,
 };
 
@@ -108,7 +108,10 @@ impl Registerable for TraitType {
 }
 
 /// Assign IDs to items and call post_init. Shared logic for all registry types.
-fn init_registry<T: Registerable>(mut items: Vec<&'static T>) -> Box<[&'static T]> {
+fn init_registry<T: Registerable>(
+    mut items: Vec<&'static T>,
+    id_fn: impl Fn(&T, NonZeroU16) -> u16,
+) -> Box<[&'static T]> {
     // Sort by global name for stable, deterministic ID assignment
     items.sort_unstable_by_key(|item| item.ty().global_name);
 
@@ -125,7 +128,7 @@ fn init_registry<T: Registerable>(mut items: Vec<&'static T>) -> Box<[&'static T
         }
         prev_name = Some(global_name);
         // SAFETY: Single-threaded during Lazy init; no concurrent readers yet.
-        unsafe { std::ptr::write(SyncUnsafeCell::raw_get(&item.ty().id), u16::from(id)) };
+        unsafe { std::ptr::write(SyncUnsafeCell::raw_get(&item.ty().id), id_fn(item, id)) };
         id = id.checked_add(1).expect("overflowing item ids");
     }
 
@@ -174,6 +177,7 @@ static FUNCTIONS: Lazy<Box<[&'static NativeFunction]>> = Lazy::new(|| {
             .into_iter()
             .copied()
             .collect(),
+        |_, id| u16::from(id),
     )
 });
 
@@ -197,6 +201,13 @@ pub(crate) static VALUES: Lazy<Box<[&'static ValueType]>> = Lazy::new(|| {
             .into_iter()
             .copied()
             .collect(),
+        |v, mut id| {
+            assert!(id.get() & SESSION_STATEFUL_BIT == 0);
+            if v.is_session_stateful {
+                id |= SESSION_STATEFUL_BIT;
+            }
+            u16::from(id)
+        },
     );
     crate::value_type::register_all_trait_methods(&items);
     items
@@ -209,11 +220,11 @@ pub fn get_value_type_id(value: &'static ValueType) -> ValueTypeId {
 
 #[inline]
 pub fn get_value_type(id: ValueTypeId) -> &'static ValueType {
-    get_item(&VALUES, id)
+    get_item(&VALUES, id.without_session_stateful_bit())
 }
 
 pub fn validate_value_type_id(id: ValueTypeId) -> Option<Error> {
-    validate_id(&VALUES, id)
+    validate_id(&VALUES, id.without_session_stateful_bit())
 }
 
 /// Number of registered trait types. Forces TRAITS init.
@@ -228,6 +239,7 @@ static TRAITS: Lazy<Box<[&'static TraitType]>> = Lazy::new(|| {
             .into_iter()
             .copied()
             .collect(),
+        |_, id| u16::from(id),
     )
 });
 

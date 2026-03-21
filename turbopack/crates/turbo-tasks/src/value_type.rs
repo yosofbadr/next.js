@@ -48,6 +48,8 @@ pub struct ValueType {
     /// for `RawVc` to know what the appropriate `VcCellMode` is.
     pub(crate) raw_cell: RawCellFactoryFn,
 
+    pub(crate) is_session_stateful: bool,
+
     traits: SyncUnsafeCell<ValueTypeTraits>,
 }
 
@@ -147,6 +149,7 @@ impl ValueType {
         Self {
             ty: RegistryType::new::<T>(std::any::type_name::<T>(), global_name),
             bincode,
+            is_session_stateful: T::IS_SESSION_STATEFUL,
             raw_cell: <T::CellMode as VcCellMode<T>>::raw_cell,
             traits: SyncUnsafeCell::new(ValueTypeTraits { traits: None }),
         }

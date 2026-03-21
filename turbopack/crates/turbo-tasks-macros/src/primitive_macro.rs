@@ -71,6 +71,7 @@ pub fn primitive(input: TokenStream) -> TokenStream {
         },
         new_value_type,
         /* has_serialization */ quote! { true },
+        /* session_stateful */ false,
     );
 
     let value_default_impl = quote! {

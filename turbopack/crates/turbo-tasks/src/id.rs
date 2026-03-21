@@ -166,6 +166,22 @@ impl TaskId {
     }
 }
 
+pub const SESSION_STATEFUL_BIT: u16 = 0x8000;
+
+impl ValueTypeId {
+    pub fn is_session_stateful(&self) -> bool {
+        **self & SESSION_STATEFUL_BIT != 0
+    }
+
+    /// Returns this ID with `SESSION_STATEFUL_BIT` cleared, for use as a
+    /// registry index.
+    #[inline]
+    pub(crate) fn without_session_stateful_bit(self) -> Self {
+        // SAFETY: construction ensures that we only set this on ids with lowermost bits set as well
+        unsafe { Self::new_unchecked(*self & !SESSION_STATEFUL_BIT) }
+    }
+}
+
 macro_rules! make_registered_serializable {
     ($ty:ty, $primitive:ty, $get_object:path, $validate_type_id:path $(,)?) => {
         impl Serialize for $ty {

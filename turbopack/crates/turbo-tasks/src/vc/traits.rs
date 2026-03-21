@@ -22,6 +22,10 @@ pub unsafe trait VcValueType: ShrinkToFit + Sized + Send + Sync + 'static {
 
     /// How to update cells of this value type.
     type CellMode: VcCellMode<Self>;
+    /// Whether this value type has session-dependent interior state (e.g. `#[bincode(skip)]` fields
+    /// that accumulate runtime state). Cells containing session-stateful values will not be evicted
+    /// mid-session, since the deserialized value would lose that state.
+    const IS_SESSION_STATEFUL: bool;
 
     /// Returns the type id of the value type.
     fn get_value_type_id() -> ValueTypeId;

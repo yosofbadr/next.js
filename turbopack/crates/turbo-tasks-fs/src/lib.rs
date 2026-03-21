@@ -497,7 +497,7 @@ impl DiskFileSystemInner {
 
 #[derive(Clone, ValueToString)]
 #[value_to_string(self.inner.name)]
-#[turbo_tasks::value(cell = "new", eq = "manual")]
+#[turbo_tasks::value(cell = "new", eq = "manual", session_stateful)]
 pub struct DiskFileSystem {
     inner: Arc<DiskFileSystemInner>,
 }

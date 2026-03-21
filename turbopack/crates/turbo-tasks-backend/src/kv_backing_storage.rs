@@ -226,7 +226,13 @@ impl<T: KeyValueDatabase + Send + Sync + 'static> BackingStorageSealed
     where
         I: IntoIterator<Item = SnapshotItem> + Send + Sync,
     {
-        let _span = tracing::info_span!("save snapshot", operations = operations.len()).entered();
+        let span = tracing::info_span!(
+            "save snapshot",
+            operations = operations.len(),
+            meta = tracing::field::Empty,
+            data = tracing::field::Empty,
+        );
+        let _span = span.enter();
         let batch = self.inner.database.write_batch()?;
 
         {
