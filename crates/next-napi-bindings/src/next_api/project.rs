@@ -429,6 +429,7 @@ pub struct ProjectInstance {
     container: Option<ResolvedVc<ProjectContainer>>,
     exit_receiver: tokio::sync::Mutex<Option<ExitReceiver>>,
     /// When set, this project was created via the daemon IPC path.
+    #[allow(dead_code)]
     remote: Option<RemoteProject>,
 }
 
@@ -453,6 +454,7 @@ impl ProjectInstance {
     }
 
     /// Returns true if this is a remote (daemon-backed) project.
+    #[allow(dead_code)]
     fn is_remote(&self) -> bool {
         self.remote.is_some()
     }
@@ -1614,7 +1616,7 @@ pub async fn project_write_all_entrypoints_to_disk(
         result: if let Some(entrypoints) = entrypoints {
             Some(NapiEntrypoints::from_entrypoints_op(
                 &entrypoints,
-                &project.ctx(),
+                project.ctx(),
             )?)
         } else {
             None
@@ -1822,7 +1824,7 @@ pub async fn project_entrypoints(
     let result = match entrypoints {
         Some(entrypoints) => Some(NapiEntrypoints::from_entrypoints_op(
             &entrypoints,
-            &project.ctx(),
+            project.ctx(),
         )?),
         None => None,
     };
