@@ -244,6 +244,7 @@ impl Storage {
             }
 
             Some(SnapshotShard {
+                shard_idx,
                 modified,
                 storage: self,
                 process,
@@ -544,6 +545,7 @@ impl Drop for SnapshotGuard<'_> {
 }
 
 pub struct SnapshotShard<'l, P> {
+    shard_idx: usize,
     modified: Vec<TaskId>,
     storage: &'l Storage,
     process: &'l P,
@@ -616,10 +618,9 @@ where
             // If any _during_snapshot flags are set, promote them to modified so
             // the next snapshot cycle picks them up. end_snapshot won't see this
             // task because we removed its entry from snapshots above.
-            self.shard.storage.promote_during_snapshot_flags(
-                &mut inner,
-                self.shard.storage.shard_index(&task_id),
-            );
+            self.shard
+                .storage
+                .promote_during_snapshot_flags(&mut inner, self.shard.shard_idx);
             return Some(item);
         }
         None
