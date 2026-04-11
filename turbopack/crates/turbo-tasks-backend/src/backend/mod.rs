@@ -2892,21 +2892,33 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                             // Evict persisted tasks from memory to reclaim space.
                             // Like compaction, this runs after snapshot_and_persist
                             // as a separate concern.
+                            //
+                            // TODO: improve eviction policy — current approach is a full sweep
+                            // after every snapshot. Better strategies to consider:
+                            //   - Memory pressure signals: only evict when RSS exceeds a threshold
+                            //     rather than unconditionally.
+                            //   - Recency data: track last-access time per task and evict
+                            //     least-recently-used entries first rather than all at once.
+                            //   - Eviction intensity: partial sweeps (evict a fraction of eligible
+                            //     tasks per cycle) to reduce latency spikes.
+                            // Polls the idle-end event without blocking. Returns
+                            // `true` and refreshes the listener if idle has ended,
+                            // `false` if we are still idle.
+                            macro_rules! check_idle_ended {
+                                () => {{
+                                    tokio::select! {
+                                        biased;
+                                        _ = &mut idle_end_listener => {
+                                            idle_end_listener = self.idle_end_event.listen();
+                                            true
+                                        },
+                                        _ = std::future::ready(()) => false,
+                                    }
+                                }};
+                            }
 
-                            // TODO: should we only run if we stored new data? syncing data to disk
-                            // implies that some of it is eligible for eviction, but if nothing was
-                            // stored then that isn't true.   on the other hand pre-fetching might
-                            // bring unused data into the heap.
-                            if this.should_evict() && new_data {
-                                let idle_ended = tokio::select! {
-                                    biased;
-                                    _ = &mut idle_end_listener => {
-                                        idle_end_listener = self.idle_end_event.listen();
-                                        true
-                                    },
-                                    _ = std::future::ready(()) => false,
-                                };
-                                if !idle_ended {
+                            if this.should_evict() {
+                                if !check_idle_ended!() {
                                     let evict_span = tracing::info_span!(
                                         parent: background_span.id(),
                                         "evict tasks",
@@ -2932,15 +2944,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                             // suspends at the `select!` await below.
                             const MAX_IDLE_COMPACTION_PASSES: usize = 10;
                             for _ in 0..MAX_IDLE_COMPACTION_PASSES {
-                                let idle_ended = tokio::select! {
-                                    biased;
-                                    _ = &mut idle_end_listener => {
-                                        idle_end_listener = self.idle_end_event.listen();
-                                        true
-                                    },
-                                    _ = std::future::ready(()) => false,
-                                };
-                                if idle_ended {
+                                if check_idle_ended!() {
                                     break;
                                 }
                                 // Enter the span only around the synchronous
