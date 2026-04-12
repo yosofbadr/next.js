@@ -500,6 +500,9 @@ impl TaskStorage {
         }
 
         // This is common after a round of eviction we end up with tasks with only transient state
+        // There is no need to search for it, we can just assume any task in this state is preserved
+        // for a reason.  NOTE: new tasks have the restored flags set as part of construction so the
+        // only way for a task to end up in this situation is through eviction
         if !flags.data_restored() && !flags.meta_restored() {
             return (
                 key_evictability,
@@ -510,7 +513,8 @@ impl TaskStorage {
         // Back off if another thread is currently restoring this task's data from
         // disk. Without this check, eviction could clear data that was already
         // determined to be "restored" by the restoring thread (which released the
-        // lock to do I/O), causing the restoring thread to skip re-reading it.
+        // lock to do I/O), causing the restoring thread to skip re-reading it.  Instead we respect
+        // in flight restoration
         if flags.meta_restoring() || flags.data_restoring() {
             return (
                 key_evictability,
@@ -526,6 +530,8 @@ impl TaskStorage {
             && !flags.data_modified_during_snapshot()
             && self.transient_cell_data().is_none_or(|m| m.is_empty())
             // If transient tasks depend on our cells or output we cannot be evicted
+
+            // TODO: this is the most expensive part of the scan since there can be many cell and output dependents as well as many cells
             && self
                 .cell_dependents()
                 .is_none_or(|cd| !cd.iter().any(|(_, _, t)| t.is_transient()))
@@ -543,11 +549,12 @@ impl TaskStorage {
         let meta_evictable = flags.meta_restored()
             && !flags.meta_modified()
             && !flags.meta_modified_during_snapshot()
+            && self.get_output().is_none_or(|o| !o.is_transient())
+            // TODO: this is the most expensive part of the scan since there can be many dependents and uppers
             && self
                 .collectibles_dependents()
                 .is_none_or(|d| !d.iter().any(|(_trait_id, task)| task.is_transient()))
-            && !self.upper().iter().any(|(k, _)| k.is_transient())
-            && self.get_output().is_none_or(|o| !o.is_transient());
+            && !self.upper().iter().any(|(k, _)| k.is_transient());
 
         // === Combined decision ===
         (

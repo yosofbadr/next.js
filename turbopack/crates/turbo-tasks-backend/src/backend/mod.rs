@@ -2919,20 +2919,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
 
                             if this.should_evict() {
                                 if !check_idle_ended!() {
-                                    let evict_span = tracing::info_span!(
-                                        parent: background_span.id(),
-                                        "evict tasks",
-                                        full = tracing::field::Empty,
-                                        data_and_meta = tracing::field::Empty,
-                                        data_only = tracing::field::Empty,
-                                        meta_only = tracing::field::Empty,
-                                    );
-                                    let _guard = evict_span.enter();
-                                    let counts = this.storage.evict_after_snapshot();
-                                    evict_span.record("full", counts.full);
-                                    evict_span.record("data_and_meta", counts.data_and_meta);
-                                    evict_span.record("data_only", counts.data_only);
-                                    evict_span.record("meta_only", counts.meta_only);
+                                    this.storage.evict_after_snapshot();
                                 }
                             }
 

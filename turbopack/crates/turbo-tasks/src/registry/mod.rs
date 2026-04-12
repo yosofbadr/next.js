@@ -202,7 +202,10 @@ pub(crate) static VALUES: Lazy<Box<[&'static ValueType]>> = Lazy::new(|| {
             .copied()
             .collect(),
         |v, mut id| {
-            assert!(id.get() & SESSION_STATEFUL_BIT == 0);
+            assert!(
+                id.get() & SESSION_STATEFUL_BIT == 0,
+                "SESSION_STATEFUL_BIT already set? do we have more than 32k value types"
+            );
             if v.is_session_stateful {
                 id |= SESSION_STATEFUL_BIT;
             }

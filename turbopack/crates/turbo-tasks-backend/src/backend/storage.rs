@@ -388,7 +388,7 @@ impl Storage {
     /// - `No`: skip
     ///
     /// Must be called when NOT in snapshot mode (i.e., after `end_snapshot()`).
-    pub fn evict_after_snapshot(&self) -> EvictionCounts {
+    pub fn evict_after_snapshot(&self) {
         let span = tracing::trace_span!(
             "evict_after_snapshot",
             task_cache = tracing::field::Empty,
@@ -489,7 +489,6 @@ impl Storage {
         span.record("data_only", totals.data_only);
         span.record("meta_only", totals.meta_only);
         span.record("skipped", skipped);
-        totals
     }
 }
 
