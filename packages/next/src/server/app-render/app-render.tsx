@@ -4396,7 +4396,7 @@ async function renderToStream(
               {
                 nonce,
                 bootstrapScriptContent,
-                bootstrapScripts: [errorBootstrapScript],
+                ...errorBootstrapProps,
                 formState,
               },
               { waitForAllReady: generateStaticHTML }
@@ -4493,7 +4493,7 @@ async function renderToStream(
               {
                 nonce,
                 bootstrapScriptContent,
-                bootstrapScripts: [errorBootstrapScript],
+                ...errorBootstrapProps,
                 formState,
               }
             )
