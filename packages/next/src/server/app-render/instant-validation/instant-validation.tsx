@@ -1241,7 +1241,7 @@ export async function createCombinedPayloadAtDepth(
       requiresInstantUI = false
       createInstantStack = null
       configDepth = -1
-    } else if (instantConfig && typeof instantConfig === 'object') {
+    } else if (instantConfig === true || typeof instantConfig === 'object') {
       requiresInstantUI = true
       createInstantStack = localCreateInstantStack
       configDepth = segmentDepth
