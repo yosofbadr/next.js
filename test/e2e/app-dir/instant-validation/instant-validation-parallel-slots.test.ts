@@ -116,7 +116,7 @@ describe('instant validation - parallel slot configs', () => {
                {
                  "label": "Caused by: Instant Validation",
                  "source": "app/suspense-in-root/parallel/slot-config-only/@slot/page.tsx (1:33) @ unstable_instant
-           > 1 | export const unstable_instant = { prefetch: 'static' }
+           > 1 | export const unstable_instant = true
                |                                 ^",
                  "stack": [
                    "unstable_instant app/suspense-in-root/parallel/slot-config-only/@slot/page.tsx (1:33)",
@@ -178,7 +178,7 @@ describe('instant validation - parallel slot configs', () => {
                {
                  "label": "Caused by: Instant Validation",
                  "source": "app/suspense-in-root/parallel/slot-layout-config/@slot/layout.tsx (3:33) @ unstable_instant
-           > 3 | export const unstable_instant = { prefetch: 'static' }
+           > 3 | export const unstable_instant = true
                |                                 ^",
                  "stack": [
                    "unstable_instant app/suspense-in-root/parallel/slot-layout-config/@slot/layout.tsx (3:33)",
@@ -240,7 +240,7 @@ describe('instant validation - parallel slot configs', () => {
                {
                  "label": "Caused by: Instant Validation",
                  "source": "app/suspense-in-root/parallel/slot-runtime-config/@slot/page.tsx (4:33) @ unstable_instant
-           > 4 | export const unstable_instant = {
+           > 4 | export const unstable_instant = true
                |                                 ^",
                  "stack": [
                    "unstable_instant app/suspense-in-root/parallel/slot-runtime-config/@slot/page.tsx (4:33)",
@@ -304,7 +304,7 @@ describe('instant validation - parallel slot configs', () => {
                {
                  "label": "Caused by: Instant Validation",
                  "source": "app/suspense-in-root/parallel/children-config-with-slot/page.tsx (1:33) @ unstable_instant
-           > 1 | export const unstable_instant = { prefetch: 'static' }
+           > 1 | export const unstable_instant = true
                |                                 ^",
                  "stack": [
                    "unstable_instant app/suspense-in-root/parallel/children-config-with-slot/page.tsx (1:33)",
@@ -368,7 +368,7 @@ describe('instant validation - parallel slot configs', () => {
                  {
                    "label": "Caused by: Instant Validation",
                    "source": "app/suspense-in-root/parallel/fork-layout-config-with-slot/layout.tsx (3:33) @ unstable_instant
-           > 3 | export const unstable_instant = { prefetch: 'static' }
+           > 3 | export const unstable_instant = true
                |                                 ^",
                    "stack": [
                      "unstable_instant app/suspense-in-root/parallel/fork-layout-config-with-slot/layout.tsx (3:33)",
@@ -406,7 +406,7 @@ describe('instant validation - parallel slot configs', () => {
                  {
                    "label": "Caused by: Instant Validation",
                    "source": "app/suspense-in-root/parallel/fork-layout-config-with-slot/layout.tsx (3:33) @ unstable_instant
-           > 3 | export const unstable_instant = { prefetch: 'static' }
+           > 3 | export const unstable_instant = true
                |                                 ^",
                    "stack": [
                      "unstable_instant app/suspense-in-root/parallel/fork-layout-config-with-slot/layout.tsx (3:33)",
@@ -542,7 +542,7 @@ describe('instant validation - parallel slot configs', () => {
                {
                  "label": "Caused by: Instant Validation",
                  "source": "app/suspense-in-root/parallel/conditional-breadcrumbs/show-both/blocked/page.tsx (1:33) @ unstable_instant
-           > 1 | export const unstable_instant = { prefetch: 'static' }
+           > 1 | export const unstable_instant = true
                |                                 ^",
                  "stack": [
                    "unstable_instant app/suspense-in-root/parallel/conditional-breadcrumbs/show-both/blocked/page.tsx (1:33)",
@@ -604,7 +604,7 @@ describe('instant validation - parallel slot configs', () => {
              "environmentLabel": "Server",
              "label": "Console Error",
              "source": "app/suspense-in-root/parallel/conditional-breadcrumbs/show-only-breadcrumbs/unblocked/page.tsx (1:33) @ unstable_instant
-           > 1 | export const unstable_instant = { prefetch: 'static' }
+           > 1 | export const unstable_instant = true
                |                                 ^",
              "stack": [
                "unstable_instant app/suspense-in-root/parallel/conditional-breadcrumbs/show-only-breadcrumbs/unblocked/page.tsx (1:33)",
@@ -635,7 +635,7 @@ describe('instant validation - parallel slot configs', () => {
              "environmentLabel": "Server",
              "label": "Console Error",
              "source": "app/suspense-in-root/parallel/conditional-breadcrumbs/show-only-breadcrumbs/blocked/page.tsx (1:33) @ unstable_instant
-           > 1 | export const unstable_instant = { prefetch: 'static' }
+           > 1 | export const unstable_instant = true
                |                                 ^",
              "stack": [
                "unstable_instant app/suspense-in-root/parallel/conditional-breadcrumbs/show-only-breadcrumbs/blocked/page.tsx (1:33)",

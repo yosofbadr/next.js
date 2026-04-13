@@ -48,12 +48,13 @@ export async function isPageAllowedToBlock(tree: LoaderTree): Promise<boolean> {
   // the page isn't allowed to block. The config expresses a requirement for
   // instant UI, so we should make sure that a static shell exists.
   // (even if it'd use runtime prefetching for client navs)
-  if (instantConfig !== undefined) {
-    if (instantConfig === false) {
-      return true
-    } else {
-      return false
-    }
+  if (instantConfig === false) {
+    return true
+  } else if (
+    instantConfig === true ||
+    (typeof instantConfig === 'object' && instantConfig !== null)
+  ) {
+    return false
   }
 
   const { parallelRoutes } = parseLoaderTree(tree)
@@ -157,8 +158,8 @@ export const resolveInstantConfigSamplesForPage = async (
 
   let samples: InstantSample[] | null = null
   if (
-    instantConfig !== undefined &&
     typeof instantConfig === 'object' &&
+    instantConfig !== null &&
     instantConfig.samples
   ) {
     samples = instantConfig.samples

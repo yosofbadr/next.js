@@ -1,9 +1,6 @@
 import { ensureThrows } from '../../../../ensure-error'
 
-export const unstable_instant = {
-  prefetch: 'runtime',
-  samples: [{ searchParams: { q: 'test' } }],
-}
+export const unstable_instant = { samples: [{ searchParams: { q: 'test' } }] }
 export const unstable_prefetch = 'runtime'
 
 export default async function Page({

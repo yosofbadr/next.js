@@ -1,4 +1,4 @@
-export const unstable_instant = { prefetch: 'runtime', samples: [{}] }
+export const unstable_instant = true
 export const unstable_prefetch = 'runtime'
 
 export default async function Page() {
