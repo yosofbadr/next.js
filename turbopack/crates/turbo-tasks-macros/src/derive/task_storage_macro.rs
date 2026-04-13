@@ -2590,10 +2590,6 @@ fn generate_drop_methods(grouped_fields: &GroupedFields) -> TokenStream {
     let mut drop_data_inline = Vec::new();
     for field in grouped_fields.persistent_inline(Category::Data) {
         let field_name = &field.field_name;
-        // Skip persistent_task_type — needed for task_cache mappings
-        if field_name == "persistent_task_type" {
-            continue;
-        }
         drop_data_inline.push(quote! {
             self.#field_name = Default::default();
         });
@@ -2621,7 +2617,6 @@ fn generate_drop_methods(grouped_fields: &GroupedFields) -> TokenStream {
             /// so the next access triggers a restore from the backing storage.
             pub fn drop_data(&mut self) {
                 // Reset data-category inline fields to defaults
-                // (persistent_task_type is intentionally preserved)
                 #(#drop_data_inline)*
 
                 // Remove all persistent data-category lazy fields
@@ -2664,7 +2659,6 @@ fn generate_drop_methods(grouped_fields: &GroupedFields) -> TokenStream {
             /// are cleared, along with `prefetched`.
             pub fn drop_data_and_meta(&mut self) {
                 // Reset all persistent inline fields to defaults
-                // (persistent_task_type is intentionally preserved)
                 #(#drop_data_inline)*
                 #(#drop_meta_inline)*
 

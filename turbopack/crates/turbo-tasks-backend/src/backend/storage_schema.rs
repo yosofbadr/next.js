@@ -436,12 +436,11 @@ impl TaskFlags {
 pub enum UnevictableReason {
     InProgress,
     Restoring,
-    TransientDependents,
-    TransientData,
-    TransientUppers,
-    SessionState,
-    SessionStateful,
+    /// Modified flags are set, or data/meta has not been restored yet.
     Modified,
+    /// Transient references or session-stateful cells are present (detected without
+    /// re-running the expensive per-field checks).
+    TransientOrStateful,
     NothingToEvict,
 }
 
@@ -464,6 +463,9 @@ pub enum DataEvictability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyEvictability {
     Evictable,
+    /// The task was already removed from `task_cache` in a prior eviction cycle.
+    /// No hash lookup is needed; the caller can skip the remove entirely.
+    AlreadyEvicted,
     /// This means the task is new, so we cannot evict it
     Unevictable,
 }
@@ -482,10 +484,20 @@ impl TaskStorage {
     pub fn evictability(&self) -> (KeyEvictability, DataEvictability) {
         let flags = &self.flags;
 
-        let key_evictability = if flags.new_task() || self.persistent_task_type.is_none() {
+        let key_evictability = if flags.new_task() {
             KeyEvictability::Unevictable
         } else {
-            KeyEvictability::Evictable
+            match &self.persistent_task_type {
+                None => KeyEvictability::Unevictable,
+                // strong_count == 1: only TaskStorage holds this Arc, so no task_cache
+                // entry references it — already evicted in a prior cycle. This covers
+                // tasks that are key-evictable but not data-evictable (data stays in
+                // the shard, persistent_task_type is never dropped).
+                Some(arc) if std::sync::Arc::strong_count(arc) == 1 => {
+                    KeyEvictability::AlreadyEvicted
+                }
+                Some(_) => KeyEvictability::Evictable,
+            }
         };
         // === Absolute blockers ===
         if flags.new_task()
@@ -588,7 +600,22 @@ impl TaskStorage {
                 }
                 (true, false) => DataEvictability::DataOnly,
                 (false, true) => DataEvictability::MetaOnly,
-                (false, false) => DataEvictability::No(UnevictableReason::Modified),
+                (false, false) => {
+                    // Cheap flags checked first; if those are clear the blocker must
+                    // be one of the expensive transient/stateful checks above.
+                    let reason = if flags.data_modified()
+                        || flags.data_modified_during_snapshot()
+                        || flags.meta_modified()
+                        || flags.meta_modified_during_snapshot()
+                    {
+                        UnevictableReason::Modified
+                    } else {
+                        // Transient references, transient cell data, or session-stateful
+                        // cells are blocking — don't repeat the expensive checks.
+                        UnevictableReason::TransientOrStateful
+                    };
+                    DataEvictability::No(reason)
+                }
             },
         )
     }

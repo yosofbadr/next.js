@@ -10,6 +10,7 @@ use std::{
 
 use rustc_hash::{FxHashMap, FxHasher};
 use thread_local::ThreadLocal;
+use tracing::span::Id;
 use turbo_bincode::TurboBincodeBuffer;
 use turbo_tasks::{FxDashMap, TaskId, backend::CachedTaskType, event::Event, parallel};
 
@@ -388,15 +389,23 @@ impl Storage {
     /// - `No`: skip
     ///
     /// Must be called when NOT in snapshot mode (i.e., after `end_snapshot()`).
-    pub fn evict_after_snapshot(&self) {
+    pub fn evict_after_snapshot(&self, parent_span: Option<Id>) -> EvictionCounts {
         let span = tracing::trace_span!(
+            parent: parent_span,
             "evict_after_snapshot",
-            task_cache = tracing::field::Empty,
+            total_task_cache_keys = self.task_cache.len(),
+            total_map_keys = self.map.len(),
+            task_cache_evictions = tracing::field::Empty,
             full = tracing::field::Empty,
             data_and_meta = tracing::field::Empty,
             data_only = tracing::field::Empty,
             meta_only = tracing::field::Empty,
             skipped = tracing::field::Empty,
+            skipped_in_progress = tracing::field::Empty,
+            skipped_restoring = tracing::field::Empty,
+            skipped_modified = tracing::field::Empty,
+            skipped_transient_or_stateful = tracing::field::Empty,
+            skipped_nothing_to_evict = tracing::field::Empty,
         )
         .entered();
         debug_assert!(
@@ -418,14 +427,20 @@ impl Storage {
                     }
                     let (key, data) = task.get().evictability();
                     if matches!(key, KeyEvictability::Evictable) {
-                        evicted.key_evictions += 1;
                         // The task type is persisted to backing storage (new_task = false),
                         // so task_cache is a pure perf cache. Remove it now; it will be
                         // re-populated by task_by_type() on the next cache miss.
-                        if let Some(task_type) = task.get().get_persistent_task_type() {
-                            self.task_cache.remove(task_type.as_ref());
+
+                        if self
+                            .task_cache
+                            .remove(task.get().get_persistent_task_type().unwrap().as_ref())
+                            .is_some()
+                        {
+                            evicted.key_evictions += 1;
                         }
                     }
+                    // KeyEvictability::AlreadyEvicted: strong_count == 1 means no
+                    // task_cache entry holds a reference — skip the hash lookup.
                     match data {
                         DataEvictability::Full => {
                             unsafe {
@@ -464,6 +479,7 @@ impl Storage {
                 }
                 (evicted, reason_counts)
             });
+
         let mut totals = EvictionCounts::default();
         let mut reasons: FxHashMap<UnevictableReason, usize> = FxHashMap::default();
         for (evicted, r) in counts {
@@ -483,12 +499,49 @@ impl Storage {
             self.task_cache.shrink_to_fit();
         }
         let skipped: usize = reasons.values().sum();
-        span.record("task_cache", totals.key_evictions);
+        span.record("task_cache_evictions", totals.key_evictions);
         span.record("full", totals.full);
         span.record("data_and_meta", totals.data_and_meta);
         span.record("data_only", totals.data_only);
         span.record("meta_only", totals.meta_only);
         span.record("skipped", skipped);
+        span.record(
+            "skipped_in_progress",
+            reasons
+                .get(&UnevictableReason::InProgress)
+                .copied()
+                .unwrap_or(0),
+        );
+        span.record(
+            "skipped_restoring",
+            reasons
+                .get(&UnevictableReason::Restoring)
+                .copied()
+                .unwrap_or(0),
+        );
+        span.record(
+            "skipped_modified",
+            reasons
+                .get(&UnevictableReason::Modified)
+                .copied()
+                .unwrap_or(0),
+        );
+        span.record(
+            "skipped_transient_or_stateful",
+            reasons
+                .get(&UnevictableReason::TransientOrStateful)
+                .copied()
+                .unwrap_or(0),
+        );
+        span.record(
+            "skipped_nothing_to_evict",
+            reasons
+                .get(&UnevictableReason::NothingToEvict)
+                .copied()
+                .unwrap_or(0),
+        );
+
+        totals
     }
 }
 

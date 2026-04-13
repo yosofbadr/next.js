@@ -469,6 +469,10 @@ impl<S: ParallelScheduler, const FAMILIES: usize> TurboPersistence<S, FAMILIES> 
                  operations is allowed at a time)"
             );
         }
+        // Free decompressed block caches before the write cycle begins. Writes are
+        // memory-intensive (building new SST files), and cached blocks from old SSTs
+        // will be superseded by new sequence numbers after commit anyway.
+        self.clear_block_caches();
         let current = self.inner.read().current_sequence_number;
         Ok(WriteBatch::new(
             self.path.clone(),
@@ -480,8 +484,7 @@ impl<S: ParallelScheduler, const FAMILIES: usize> TurboPersistence<S, FAMILIES> 
 
     /// Clears all caches of the database.
     pub fn clear_cache(&self) {
-        self.key_block_cache.clear();
-        self.value_block_cache.clear();
+        self.clear_block_caches();
         for meta in self.inner.write().meta_files.iter_mut() {
             meta.clear_cache();
         }

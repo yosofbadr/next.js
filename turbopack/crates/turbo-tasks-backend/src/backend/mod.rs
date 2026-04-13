@@ -91,7 +91,7 @@ static IDLE_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| {
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .map(Duration::from_millis)
-        .unwrap_or(Duration::from_secs(10))
+        .unwrap_or(Duration::from_secs(2))
 });
 
 struct SnapshotRequest {
@@ -382,7 +382,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                 return (false, EvictionCounts::default());
             }
         };
-        let counts = self.storage.evict_after_snapshot();
+        let counts = self.storage.evict_after_snapshot(None);
         (had_new_data, counts)
     }
 
@@ -1578,19 +1578,19 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         let mut ctx = self.execute_context(turbo_tasks);
 
         let mut is_new = false;
-        let (task_id, task_type) = if let Some(task_id) = ctx.task_by_type(&task_type) {
-            // Task exists in backing storage
-            // So we only need to insert it into the in-memory cache
+        let (task_id, task_type) = if let Some((task_id, arc)) = ctx.task_by_type(&task_type) {
+            // Task exists in backing storage — re-insert into task_cache using the task's
+            // own Arc so task_cache and persistent_task_type share the same allocation.
+            // This maintains the invariant that Arc::strong_count on persistent_task_type
+            // reflects whether a task_cache entry holds a reference.
             self.track_cache_hit(&task_type);
-            let task_type = match raw_entry(&self.storage.task_cache, &task_type) {
-                RawEntry::Occupied(_) => ArcOrOwned::Owned(task_type),
+            match raw_entry(&self.storage.task_cache, &task_type) {
+                RawEntry::Occupied(_) => {}
                 RawEntry::Vacant(e) => {
-                    let task_type = Arc::new(task_type);
-                    e.insert(task_type.clone(), task_id);
-                    ArcOrOwned::Arc(task_type)
+                    e.insert(arc.clone(), task_id);
                 }
-            };
-            (task_id, task_type)
+            }
+            (task_id, ArcOrOwned::Arc(arc))
         } else {
             // Task doesn't exist in memory cache or backing storage
             // So we might need to create a new task
@@ -2889,18 +2889,6 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                         if let Some((snapshot_start, new_data)) = snapshot {
                             last_snapshot = snapshot_start;
 
-                            // Evict persisted tasks from memory to reclaim space.
-                            // Like compaction, this runs after snapshot_and_persist
-                            // as a separate concern.
-                            //
-                            // TODO: improve eviction policy — current approach is a full sweep
-                            // after every snapshot. Better strategies to consider:
-                            //   - Memory pressure signals: only evict when RSS exceeds a threshold
-                            //     rather than unconditionally.
-                            //   - Recency data: track last-access time per task and evict
-                            //     least-recently-used entries first rather than all at once.
-                            //   - Eviction intensity: partial sweeps (evict a fraction of eligible
-                            //     tasks per cycle) to reduce latency spikes.
                             // Polls the idle-end event without blocking. Returns
                             // `true` and refreshes the listener if idle has ended,
                             // `false` if we are still idle.
@@ -2916,10 +2904,21 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                                     }
                                 }};
                             }
-
+                            // Evict persisted tasks from memory to reclaim space.
+                            // Like compaction, this runs after snapshot_and_persist
+                            // as a separate concern.
+                            //
+                            // TODO: improve eviction policy — current approach is a full sweep
+                            // after every snapshot. Better strategies to consider:
+                            //   - Memory pressure signals: only evict when RSS exceeds a threshold
+                            //     rather than unconditionally.
+                            //   - Recency data: track last-access time per task and evict
+                            //     least-recently-used entries first rather than all at once.
+                            //   - Eviction intensity: partial sweeps (evict a fraction of eligible
+                            //     tasks per cycle) to reduce latency spikes.
                             if this.should_evict() {
                                 if !check_idle_ended!() {
-                                    this.storage.evict_after_snapshot();
+                                    this.storage.evict_after_snapshot(background_span.id());
                                 }
                             }
 
