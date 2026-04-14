@@ -147,14 +147,24 @@ const API_DOCS: Record<
     link: 'https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config#maxduration',
   },
   unstable_instant: {
-    description: `Specifies the default prefetching behavior for this segment. This configuration is currently under development and will change.`,
+    description: `Enables instant navigation validation for this segment. This configuration is currently under development and will change.`,
     link: '(docs coming soon)',
-    type: 'object | false',
+    type: 'true | object | false',
     // TODO: ideally, we'd validate the config object somehow, but this is difficult to do
     // with the way this plugin is currently structured.
     // For now, since we don't provide an `options` here, we won't do any validation in
     // `getSemanticDiagnosticsForExportVariableStatement` below, and only provide hover a tooltip + autocomplete.
-    insertText: 'unstable_instant = { prefetch: "static" };',
+    insertText: 'unstable_instant = true;',
+  },
+  unstable_prefetch: {
+    description: `Controls runtime prefetching for this segment. 'static' is the default behavior. 'runtime' enables runtime prefetching.`,
+    link: '(docs coming soon)',
+    type: `"static" | "runtime"`,
+    options: {
+      static: 'Default prefetching behavior.',
+      runtime: 'Enable runtime prefetching for this segment.',
+    },
+    insertText: `unstable_prefetch = 'runtime';`,
   },
   unstable_dynamicStaleTime: {
     description: `Controls how long the client-side router cache retains dynamic page data (in seconds). Pages only — not allowed in layouts. Cannot be combined with \`unstable_instant\`.`,
