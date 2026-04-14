@@ -489,10 +489,11 @@ impl TaskStorage {
         } else {
             match &self.persistent_task_type {
                 None => KeyEvictability::Unevictable,
-                // strong_count == 1: only TaskStorage holds this Arc, so no task_cache
-                // entry references it — already evicted in a prior cycle. This covers
-                // tasks that are key-evictable but not data-evictable (data stays in
-                // the shard, persistent_task_type is never dropped).
+                // strong_count == 1: only TaskStorage holds this Arc (And we are holding a lock on
+                // that), so no task_cache entry references it — already evicted in
+                // a prior cycle. This covers tasks that are key-evictable but not
+                // data-evictable (data stays in the shard, persistent_task_type is
+                // never dropped).
                 Some(arc) if std::sync::Arc::strong_count(arc) == 1 => {
                     KeyEvictability::AlreadyEvicted
                 }

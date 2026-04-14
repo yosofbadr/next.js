@@ -2916,10 +2916,8 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                             //     least-recently-used entries first rather than all at once.
                             //   - Eviction intensity: partial sweeps (evict a fraction of eligible
                             //     tasks per cycle) to reduce latency spikes.
-                            if this.should_evict() {
-                                if !check_idle_ended!() {
-                                    this.storage.evict_after_snapshot(background_span.id());
-                                }
+                            if this.should_evict() && !check_idle_ended!() {
+                                this.storage.evict_after_snapshot(background_span.id());
                             }
 
                             // Compact while idle (up to limit), regardless of

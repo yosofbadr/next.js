@@ -119,8 +119,4 @@ pub trait KeyValueDatabase {
     fn shutdown(&self) -> Result<()> {
         Ok(())
     }
-
-    fn flush_caches(&self) -> Result<()> {
-        Ok(())
-    }
 }

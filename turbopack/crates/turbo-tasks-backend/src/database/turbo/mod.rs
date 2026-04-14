@@ -156,10 +156,6 @@ impl KeyValueDatabase for TurboKeyValueDatabase {
         // Shutdown the database
         self.db.shutdown()
     }
-
-    fn flush_caches(&self) -> Result<()> {
-        Ok(())
-    }
 }
 
 fn do_compact(
