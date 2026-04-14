@@ -1,7 +1,9 @@
-import { nextTestSetup } from 'e2e-utils'
+import { nextTestSetup, isNextDev } from 'e2e-utils'
 import { retry, waitFor } from 'next-test-utils'
 
-describe('evict-after-snapshot', () => {
+// Eviction requires the dev server (HMR) and persistent caching (Turbopack).
+// Skip entirely in prod/start mode.
+;(isNextDev ? describe : describe.skip)('evict-after-snapshot', () => {
   const envVars = [
     'ENABLE_CACHING=1',
     'TURBO_ENGINE_IGNORE_DIRTY=1',
@@ -12,7 +14,6 @@ describe('evict-after-snapshot', () => {
   const { skipped, next } = nextTestSetup({
     files: __dirname,
     skipDeployment: true,
-    patchFileDelay: 500,
     packageJson: {
       scripts: {
         dev: `${envVars} next dev`,
