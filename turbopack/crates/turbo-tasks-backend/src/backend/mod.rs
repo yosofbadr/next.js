@@ -364,6 +364,7 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
     /// snapshot → evict → restore cycle works correctly.
     ///
     /// Returns `(snapshot_had_new_data, eviction_counts)`.
+    #[doc(hidden)]
     pub fn snapshot_and_evict(
         &self,
         turbo_tasks: &dyn TurboTasksBackendApi<TurboTasksBackend<B>>,
