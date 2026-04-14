@@ -41,20 +41,21 @@ import { retry, waitFor } from 'next-test-utils'
         expect(await browser.elementByCss('p').text()).toBe('hello world')
       })
 
+      let currentContent = 'hello world'
       for (let cycle = 1; cycle <= 3; cycle++) {
         await waitForSnapshotAndEviction()
 
-        await next.patchFile(
-          'app/page.tsx',
-          (content) => content.replace('hello world', `cycle ${cycle}`),
-          async () => {
-            await retry(async () => {
-              expect(await browser.elementByCss('p').text()).toBe(
-                `cycle ${cycle}`
-              )
-            }, 10000)
-          }
+        const prevContent = currentContent
+        const nextContent = `cycle ${cycle}`
+        await next.patchFile('app/page.tsx', (content) =>
+          content.replace(prevContent, nextContent)
         )
+        currentContent = nextContent
+
+        const expected = currentContent
+        await retry(async () => {
+          expect(await browser.elementByCss('p').text()).toBe(expected)
+        }, 10000)
       }
 
       await browser.close()
