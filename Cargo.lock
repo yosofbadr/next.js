@@ -10764,6 +10764,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
+ "smallvec",
  "testing",
  "tokio",
  "tracing-subscriber",
