@@ -551,9 +551,8 @@ async fn run_test_operation(resource: RcStr) -> Result<Vc<FileSystemPath>> {
             })
             .debug_ids(options.enable_debug_ids)
             .source_map_source_type(options.source_map_source_type)
-            .chunk_loading_global(options.chunk_loading_global.into());
-
-            builder = builder.emit_options(options.minify_mode.emit_options());
+            .chunk_loading_global(options.chunk_loading_global.into())
+            .emit_options(options.minify_mode.emit_options());
 
             if options.remove_unused_imports {
                 builder = builder.unused_references(
@@ -599,9 +598,8 @@ async fn run_test_operation(resource: RcStr) -> Result<Vc<FileSystemPath>> {
                 None
             })
             .debug_ids(options.enable_debug_ids)
-            .source_map_source_type(options.source_map_source_type);
-
-            builder = builder.emit_options(options.minify_mode.emit_options());
+            .source_map_source_type(options.source_map_source_type)
+            .emit_options(options.minify_mode.emit_options());
 
             if options.remove_unused_imports {
                 builder = builder.unused_references(
