@@ -6,6 +6,7 @@ const { existsSync } = require('fs')
 const fsp = require('fs/promises')
 const { createClient } = require('@vercel/kv')
 const { promisify } = require('util')
+const { createHash } = require('crypto')
 const { Sema } = require('async-sema')
 const { spawn, exec: execOrig } = require('child_process')
 const { createNextInstall } = require('./test/lib/create-next-install')
@@ -14,6 +15,100 @@ const exec = promisify(execOrig)
 const core = require('@actions/core')
 const { getTestFilter } = require('./test/get-test-filter')
 const { checkBuildFreshness } = require('./test/lib/check-build-freshness')
+
+// --- Test result caching via turbo remote cache ---
+// On CI retry attempts, skip tests that already passed on this commit.
+const TEST_RESULT_CACHE_ENV_VARS = [
+  'NEXT_TEST_MODE',
+  'IS_WEBPACK_TEST',
+  'IS_TURBOPACK_TEST',
+  'TURBOPACK_DEV',
+  'TURBOPACK_BUILD',
+  'NEXT_TEST_REACT_VERSION',
+  'NEXT_TEST_USE_RSPACK',
+  'NEXT_TEST_WASM',
+  '__NEXT_CACHE_COMPONENTS',
+  '__NEXT_EXPERIMENTAL_CACHED_NAVIGATIONS',
+  '__NEXT_EXPERIMENTAL_APP_NEW_SCROLL_HANDLER',
+  '__NEXT_USE_NODE_STREAMS',
+  '__NEXT_NODE_NATIVE_TS_LOADER_ENABLED',
+  '__NEXT_EXPERIMENTAL_STRICT_ROUTE_TYPES',
+]
+
+function shardCacheKey({ group, type, testPattern }) {
+  const branch =
+    process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || ''
+  const hash = createHash('sha256')
+  hash.update('test-result-v1\0')
+  hash.update(`${branch}\0`)
+  hash.update(`${process.env.GITHUB_SHA}\0`)
+  hash.update(`group=${group || ''}\0`)
+  hash.update(`type=${type || ''}\0`)
+  hash.update(`testPattern=${testPattern || ''}\0`)
+  for (const v of TEST_RESULT_CACHE_ENV_VARS) {
+    hash.update(`${v}=${process.env[v] || ''}\0`)
+  }
+  return hash.digest('hex')
+}
+
+function shardCacheDesc({ group, type, testPattern }) {
+  const branch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
+  const parts = [
+    `branch=${branch}`,
+    `sha=${process.env.GITHUB_SHA?.slice(0, 10)}`,
+  ]
+  if (group) parts.push(`group=${group}`)
+  if (type) parts.push(`type=${type}`)
+  if (testPattern) parts.push(`pattern=${testPattern}`)
+  for (const v of TEST_RESULT_CACHE_ENV_VARS) {
+    if (process.env[v]) parts.push(`${v}=${process.env[v]}`)
+  }
+  return parts.join(' | ')
+}
+
+let _turboCache = null
+async function getTurboCache() {
+  if (_turboCache) return _turboCache
+  if (
+    !process.env.CI ||
+    !process.env.TURBO_TOKEN ||
+    !process.env.GITHUB_SHA ||
+    process.env.NEXT_FLAKE_DETECTION ||
+    process.env.NEXT_TEST_SKIP_RESULT_CACHE
+  )
+    return null
+  try {
+    _turboCache = await import('./scripts/turbo-cache.mjs')
+    return _turboCache
+  } catch {
+    return null
+  }
+}
+
+async function loadPassedTests(cacheOpts) {
+  try {
+    const cache = await getTurboCache()
+    if (!cache) return new Set()
+    const data = await cache.get(shardCacheKey(cacheOpts))
+    if (!data) return new Set()
+    const parsed = JSON.parse(data.toString())
+    return new Set(parsed.passed || [])
+  } catch {
+    return new Set()
+  }
+}
+
+async function savePassedTests(cacheOpts, passedFiles) {
+  try {
+    const cache = await getTurboCache()
+    if (!cache) return false
+    const payload = JSON.stringify({ passed: [...passedFiles].sort() })
+    await cache.put(shardCacheKey(cacheOpts), Buffer.from(payload))
+    return true
+  } catch {
+    return false
+  }
+}
 
 // Do not rename or format. sync-react script relies on this line.
 // prettier-ignore
@@ -685,7 +780,37 @@ ${ENDGROUP}`)
       })
     })
 
+  const isRetryAttempt =
+    process.env.CI && parseInt(process.env.GITHUB_RUN_ATTEMPT || '1', 10) > 1
+  const cacheOpts = {
+    group: options.group || '',
+    type: options.type || '',
+    testPattern: options.testPattern || '',
+  }
+  const passedTestFiles = new Set()
+
+  // On retry, load previously-passed tests and filter them out
+  let cachedPassedTests = new Set()
+  if (isRetryAttempt) {
+    cachedPassedTests = await loadPassedTests(cacheOpts)
+    if (cachedPassedTests.size > 0) {
+      console.log(
+        `Test result cache: loaded ${cachedPassedTests.size} passed test(s) (${shardCacheDesc(cacheOpts)})`
+      )
+    } else {
+      console.log(`Test result cache: miss (${shardCacheDesc(cacheOpts)})`)
+    }
+  }
+
   const runTest = async (/** @type {TestFile} */ test) => {
+    // On CI retry attempts, skip tests that already passed on this commit
+    if (cachedPassedTests.has(test.file)) {
+      console.log(
+        `${test.file} already passed on this commit (cached) — skipping`
+      )
+      return
+    }
+
     let passed = false
 
     for (let i = 0; i < numRetries + 1; i++) {
@@ -719,6 +844,10 @@ ${ENDGROUP}`)
           console.error(`${test.file} failed due to ${err}`)
         }
       }
+    }
+
+    if (passed) {
+      passedTestFiles.add(test.file)
     }
 
     if (!passed) {
@@ -807,6 +936,25 @@ ${ENDGROUP}`)
     if (result.status === 'rejected') {
       hadFailures = true
       console.error(result.reason)
+    }
+  }
+
+  // Save all passed tests (from this run + previously cached) as a single cache entry
+  if (process.env.CI && passedTestFiles.size > 0) {
+    const allPassed = new Set([...cachedPassedTests, ...passedTestFiles])
+    const saved = await savePassedTests(cacheOpts, allPassed)
+    if (saved) {
+      console.log(
+        `Test result cache: saved ${allPassed.size} passed test(s) (${shardCacheDesc(cacheOpts)})`
+      )
+    }
+  }
+  if (cachedPassedTests.size > 0) {
+    const skipped = tests.filter((t) => cachedPassedTests.has(t.file)).length
+    if (skipped > 0) {
+      console.log(
+        `Test result cache: skipped ${skipped} cached, re-ran ${tests.length - skipped}`
+      )
     }
   }
 
